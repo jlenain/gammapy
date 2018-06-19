@@ -32,7 +32,7 @@ from gammapy.scripts.cta_utils import CTAObservationSimulation, Target, Observat
 ######## Configuration #########
 ################################
 
-outputtype = 'fits'  # fits or ascii
+outputtype = 'ascii'  # fits or ascii
 verbose = False
 
 # Generate a ~numpy.random.RandomState object
@@ -128,27 +128,27 @@ for site in ['North','South']:
                 irfname='./irf/irf_'+site+'/CTA-Performance-'+site+'-'+zen+'deg-'+irftime+'_20170627.fits.gz'
             ctaperf[site][zen][irftime] = CTAPerf.read(irfname)
 
-output = dict()
-output = {'Source_Name' : [],
-          'Redshift': [],
-          'Irf_Site' : [],
-          'Irf_Zen' : [],
-          'Irf_Time' : [],
-          'Livetime' : [],
-          'Emin' : [],
-          'Emin_Real' : [],
-          'AboveEthFlag' : [],
-          'Model_Name' : [],
-          'Bkg' : [],
-          'Excess' : [],
-          'Sigma' : []
-}
+# output = dict()
+# output = {'Source_Name' : [],
+#           'Redshift': [],
+#           'Irf_Site' : [],
+#           'Irf_Zen' : [],
+#           'Irf_Time' : [],
+#           'Livetime' : [],
+#           'Emin' : [],
+#           'Emin_Real' : [],
+#           'AboveEthFlag' : [],
+#           'Model_Name' : [],
+#           'Bkg' : [],
+#           'Excess' : [],
+#           'Sigma' : []
+# }
 
 
-for idx, isrc in tqdm(enumerate(catalog)):
+for idx, isrc in enumerate(tqdm(catalog)):
     # if isrc['Source_Name'] != 'J2158.8-3013':
     #     continue
-    # if idx == 10:
+    # if idx == 3:
     #     break
     if verbose:
         print(isrc)
@@ -214,7 +214,8 @@ for idx, isrc in tqdm(enumerate(catalog)):
         elif 25 * u.deg < zen_at_culmination_plus <= 45 * u.deg:
             irfzen = '40'
         else:
-            print('Source {} never above 45 deg. in site {}, skipping it...'.format(isrc['Source_Name'], mysite))
+            if verbose:
+                print('Source {} never above 45 deg. in site {}, skipping it...'.format(isrc['Source_Name'], mysite))
             continue
                     
         #Determine E threshold from zenith angle
@@ -245,6 +246,13 @@ for idx, isrc in tqdm(enumerate(catalog)):
 
 
                 for mymodel in ModelsTab:
+                    sigmadictkey = 'Sigma_{}_Irf{:d}deg_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(irfzen), int(mylivetime.value), emin_real.value, mymodel)
+                    excessdictkey = 'Excess_{}_Irf{:d}deg_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(irfzen), int(mylivetime.value), emin_real.value, mymodel)
+                    if sigmadictkey not in catalog.keys():
+                         catalog[sigmadictkey] = np.full(len(catalog), np.nan)
+                    if excessdictkey not in catalog.keys():
+                         catalog[excessdictkey] = np.full(len(catalog), np.nan)
+
                     target = Target(name=isrc['Source_Name'],model=models[mymodel])
 
                     simu = CTAObservationSimulation.simulate_obs(perf=ctaperf[mysite][irfzen][irftime],
@@ -256,33 +264,36 @@ for idx, isrc in tqdm(enumerate(catalog)):
                     excess = simu.total_stats_safe_range.excess
                     bkg = simu.total_stats_safe_range.background
                     
-                    output['Source_Name'].append(isrc['Source_Name'])
-                    output['Redshift'].append(isrc['Redshift'])
-                    output['Irf_Site'].append(mysite)
-                    output['Irf_Zen'].append(float(irfzen))
-                    output['Irf_Time'].append(float(irftime.split('h')[0]))
-                    output['Livetime'].append(mylivetime.value) # pq je ne peux pas mettre une grandeur avec unite?
-                    output['Emin'].append(emin.value) 
-                    output['Emin_Real'].append(emin_real.value) 
-                    output['Model_Name'].append(mymodel) 
-                    output['AboveEthFlag'].append(AboveEthFlag) 
-                    output['Bkg'].append(bkg)
-                    output['Excess'].append(excess)
-                    output['Sigma'].append(sigmas)
+                    # output['Source_Name'].append(isrc['Source_Name'])
+                    # output['Redshift'].append(isrc['Redshift'])
+                    # output['Irf_Site'].append(mysite)
+                    # output['Irf_Zen'].append(float(irfzen))
+                    # output['Irf_Time'].append(float(irftime.split('h')[0]))
+                    # output['Livetime'].append(mylivetime.value) # pq je ne peux pas mettre une grandeur avec unite?
+                    # output['Emin'].append(emin.value)
+                    # output['Emin_Real'].append(emin_real.value)
+                    # output['Model_Name'].append(mymodel)
+                    # output['AboveEthFlag'].append(AboveEthFlag)
+                    # output['Bkg'].append(bkg)
+                    # output['Excess'].append(excess)
+                    # output['Sigma'].append(sigmas)
+                    catalog[sigmadictkey][idx] = '{:.2f}'.format(sigmas)
+                    catalog[excessdictkey][idx] = '{:.2f}'.format(excess)
 
-results = Table()
-results['Source_Name'] = Column(output['Source_Name'], description='Source name')
-results['Redshift'] = Column(output['Redshift'], format='{:.3f}', unit='', description='Redshift')
-results['Irf_Site'] = Column(output['Irf_Site'], description='Site of the considered CTA array')
-results['Irf_Zen'] = Column(output['Irf_Zen'], format='{:.1f}', unit='degree', description='Zenith used for the IRF')
-results['Irf_Time'] = Column(output['Irf_Time'], format='{:.1f}', unit='hour', description='Livetime used for the IRF')
-results['Livetime'] = Column(output['Livetime'], format='{:.1f}', unit='hour', description='Observation time')
+# results = Table()
+# results['Source_Name'] = Column(output['Source_Name'], description='Source name')
+# results['Redshift'] = Column(output['Redshift'], format='{:.3f}', unit='', description='Redshift')
+# results['Irf_Site'] = Column(output['Irf_Site'], description='Site of the considered CTA array')
+# results['Irf_Zen'] = Column(output['Irf_Zen'], format='{:.1f}', unit='degree', description='Zenith used for the IRF')
+# results['Irf_Time'] = Column(output['Irf_Time'], format='{:.1f}', unit='hour', description='Livetime used for the IRF')
+# results['Livetime'] = Column(output['Livetime'], format='{:.1f}', unit='hour', description='Observation time')
+# results['Eth'] = Column(output['Emin_Real'], format='{:.3f}', unit='TeV', description='Energy threshold')
+# results['Model_Name'] = Column(output['Model_Name'], unit='', description='Name of the spectral model')
+# results['Sigma'] = Column(output['Sigma'], format='{:.2f}', unit='', description='Significance')
+
 # results['Emin'] = Column(output['Emin'], unit='', description='')
 # results['Emin_Real'] = Column(output['Emin_Real'], unit='', description='')
-results['Eth'] = Column(output['Emin_Real'], format='{:.3f}', unit='TeV', description='Energy threshold')
 # results['AboveEthFlag'] = Column(output['AboveEthFlag'], unit='', description='')
-results['Model_Name'] = Column(output['Model_Name'], unit='', description='Name of the spectral model')
-results['Sigma'] = Column(output['Sigma'], format='{:.2f}', unit='', description='Significance')
 ## results['SigmaErr'] = Column(src_sigma_err, unit='', description='')
 # results['Excess'] = Column(output['Excess'], unit='', description='')
 ## results['ExcessErr'] = Column(src_excess_err, unit='', description='')
@@ -296,10 +307,10 @@ if not os.path.exists(outdir):
 
 if outputtype == 'ascii':
     filename = 'results.txt'
-    results.write(outdir + filename, format='ascii', overwrite=True)
+    catalog.write(outdir + filename, format='ascii', overwrite=True)
 elif outputtype == 'fits':
     filename = 'results.fits'
-    results.write(outdir + filename, format='fits', overwrite=True)
+    catalog.write(outdir + filename, format='fits', overwrite=True)
 else:
     print('Error: output format \'{}\' not defined, no output written'.format(outputtype))
     sys.exit(1)
