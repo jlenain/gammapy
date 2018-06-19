@@ -246,8 +246,8 @@ for idx, isrc in enumerate(tqdm(catalog)):
 
 
                 for mymodel in ModelsTab:
-                    sigmadictkey = 'Sigma_{}_Irf{:d}deg_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(irfzen), int(mylivetime.value), emin_real.value, mymodel)
-                    excessdictkey = 'Excess_{}_Irf{:d}deg_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(irfzen), int(mylivetime.value), emin_real.value, mymodel)
+                    sigmadictkey = 'Sigma_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
+                    excessdictkey = 'Excess_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
                     if sigmadictkey not in catalog.keys():
                          catalog[sigmadictkey] = np.full(len(catalog), np.nan)
                     if excessdictkey not in catalog.keys():
