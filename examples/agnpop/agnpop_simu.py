@@ -248,6 +248,7 @@ for idx, isrc in enumerate(tqdm(catalog)):
                 for mymodel in ModelsTab:
                     sigmadictkey = 'Sigma_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
                     excessdictkey = 'Excess_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
+                    detectdictkey = 'Excess_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
                     if sigmadictkey not in catalog.keys():
                          catalog[sigmadictkey] = np.full(len(catalog), np.nan)
                     if excessdictkey not in catalog.keys():
@@ -263,6 +264,8 @@ for idx, isrc in enumerate(tqdm(catalog)):
                     sigmas = simu.total_stats_safe_range.sigma
                     excess = simu.total_stats_safe_range.excess
                     bkg = simu.total_stats_safe_range.background
+
+                    detected = sigmas>=5. and excess > 10 and excess > 0.05*bkg*alpha
                     
                     # output['Source_Name'].append(isrc['Source_Name'])
                     # output['Redshift'].append(isrc['Redshift'])
@@ -279,6 +282,7 @@ for idx, isrc in enumerate(tqdm(catalog)):
                     # output['Sigma'].append(sigmas)
                     catalog[sigmadictkey][idx] = '{:.2f}'.format(sigmas)
                     catalog[excessdictkey][idx] = '{:.2f}'.format(excess)
+                    catalog[detectdictkey][idx] = '{}'.format(detected)
 
 # results = Table()
 # results['Source_Name'] = Column(output['Source_Name'], description='Source name')
