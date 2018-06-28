@@ -254,6 +254,10 @@ for idx, isrc in enumerate(tqdm(catalog)):
                          catalog[sigmadictkey] = np.full(len(catalog), np.nan)
                     if excessdictkey not in catalog.keys():
                          catalog[excessdictkey] = np.full(len(catalog), np.nan)
+                    if bkgdictkey not in catalog.keys():
+                         catalog[bkgdictkey] = np.full(len(catalog), np.nan)
+                    if detectdictkey not in catalog.keys():
+                         catalog[detectdictkey] = np.full(len(catalog), np.nan)
 
                     target = Target(name=isrc['Source_Name'],model=models[mymodel])
 
@@ -284,7 +288,7 @@ for idx, isrc in enumerate(tqdm(catalog)):
                     catalog[sigmadictkey][idx] = '{:.2f}'.format(sigmas)
                     catalog[excessdictkey][idx] = '{:.2f}'.format(excess)
                     catalog[bkgdictkey][idx] = '{:.2f}'.format(bkg)
-                    catalog[detectdictkey][idx] = '{}'.format(detected)
+                    catalog[detectdictkey][idx] = detected
 
 # results = Table()
 # results['Source_Name'] = Column(output['Source_Name'], description='Source name')
@@ -317,7 +321,7 @@ if outputtype == 'ascii':
 elif outputtype == 'fits':
     filename = 'results.fits'
     catalog.write(outdir + filename, format='fits', overwrite=True)
-elif outputtype = 'both':
+elif outputtype == 'both':
     catalog.write(outdir + filename, format='ascii', overwrite=True)
     catalog.write(outdir + filename, format='fits', overwrite=True)
 else:
