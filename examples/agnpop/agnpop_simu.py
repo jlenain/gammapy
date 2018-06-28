@@ -322,7 +322,9 @@ elif outputtype == 'fits':
     filename = 'results.fits'
     catalog.write(outdir + filename, format='fits', overwrite=True)
 elif outputtype == 'both':
+    filename = 'results.txt'
     catalog.write(outdir + filename, format='ascii', overwrite=True)
+    filename = 'results.fits'
     catalog.write(outdir + filename, format='fits', overwrite=True)
 else:
     print('Error: output format \'{}\' not defined, no output written'.format(outputtype))
