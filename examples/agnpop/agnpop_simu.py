@@ -32,7 +32,7 @@ from gammapy.scripts.cta_utils import CTAObservationSimulation, Target, Observat
 ######## Configuration #########
 ################################
 
-outputtype = 'ascii'  # fits or ascii
+outputtype = 'both'  # fits or ascii or both
 verbose = False
 
 # Generate a ~numpy.random.RandomState object
@@ -248,7 +248,8 @@ for idx, isrc in enumerate(tqdm(catalog)):
                 for mymodel in ModelsTab:
                     sigmadictkey = 'Sigma_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
                     excessdictkey = 'Excess_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
-                    detectdictkey = 'Excess_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
+                    bkgdictkey = 'Bkg_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
+                    detectdictkey = 'Detected_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
                     if sigmadictkey not in catalog.keys():
                          catalog[sigmadictkey] = np.full(len(catalog), np.nan)
                     if excessdictkey not in catalog.keys():
@@ -282,6 +283,7 @@ for idx, isrc in enumerate(tqdm(catalog)):
                     # output['Sigma'].append(sigmas)
                     catalog[sigmadictkey][idx] = '{:.2f}'.format(sigmas)
                     catalog[excessdictkey][idx] = '{:.2f}'.format(excess)
+                    catalog[bkgdictkey][idx] = '{:.2f}'.format(bkg)
                     catalog[detectdictkey][idx] = '{}'.format(detected)
 
 # results = Table()
@@ -314,6 +316,9 @@ if outputtype == 'ascii':
     catalog.write(outdir + filename, format='ascii', overwrite=True)
 elif outputtype == 'fits':
     filename = 'results.fits'
+    catalog.write(outdir + filename, format='fits', overwrite=True)
+elif outputtype = 'both':
+    catalog.write(outdir + filename, format='ascii', overwrite=True)
     catalog.write(outdir + filename, format='fits', overwrite=True)
 else:
     print('Error: output format \'{}\' not defined, no output written'.format(outputtype))
