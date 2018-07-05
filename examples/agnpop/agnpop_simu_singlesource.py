@@ -10,24 +10,30 @@ Each analysis group is requested to provide the pre-trials significance (or TS) 
 - Test 6 different analysis energy thresholds: 30, 50, 100, 300, 500, 1000 GeV. Note only the thresholds above the expression Daniel calculated (see 'GetThreshold.C' at the end of this wiki) will be treated as trials, but all significance values should be provided pre-trials.
 - 3 different extrapolations: Power-law + EBL, Power-law + Exponential cutoff at 1/(1+z) TeV + EBL and log-parabola + EBL. Note the spectral parameters provided describe the intrinsic spectra. For the first two cases, the 'PL_*' columns should be used. For the third model, 'LP_*' columns should be used.
 """
+import numpy as np
+import collections
+from tqdm import tqdm
+from matplotlib import pyplot as plt
 
 from astropy import units as u
 from astropy.io import ascii
-#from astropy.units import Quantity as Q
-from astropy.table import Table, Column
+from astropy.coordinates import SkyCoord
+from regions import CircleSkyRegion
 
-import sys, os
-import numpy as np
-#import matplotlib.pyplot as plt
-import collections
-from tqdm import tqdm
-
-from matplotlib import pyplot as plt
-
-from gammapy.scripts import CTAPerf, SensitivityEstimator
+from gammapy.scripts import CTAPerf
 from gammapy.utils.modeling import Parameter, ParameterList
 from gammapy.spectrum.models import AbsorbedSpectralModel, Absorption, SpectralModel, PowerLaw, LogParabola
 from gammapy.scripts.cta_utils import CTAObservationSimulation, Target, ObservationParameters
+from gammapy.background import ReflectedRegionsBackgroundEstimator
+from gammapy.spectrum import (
+    SpectrumExtraction,
+    SpectrumFit,
+    SpectrumResult,
+    SpectrumEnergyGroupMaker,
+    FluxPointEstimator
+)
+from gammapy.utils.energy import EnergyBounds
+
 
 ################################
 ######## Configuration #########
@@ -56,7 +62,7 @@ sites_lat['South']= -25. * u.deg
 
 #EminTab = [30., 50., 100., 300., 500., 1000.] * u.GeV
 EminTab = [0.03, 0.05, 0.1, 0.3, 0.5, 1.] * u.TeV
-emax = 100 * u.TeV
+emax = 100. * u.TeV
 
 ModelsTab = ['pwl_ebl','pwl_ebl_cutoff','logp_ebl']
 
@@ -140,34 +146,11 @@ for site in ['North','South']:
             else:
                 irfname='./irf/irf_'+site+'/CTA-Performance-'+site+'-'+zen+'deg-'+irftime+'_20170627.fits.gz'
             ctaperf[site][zen][irftime] = CTAPerf.read(irfname)
-            # if irftime == '50h':
-            #     sensit[site][zen] = SensitivityEstimator(irf=ctaperf[site][zen][irftime],
-            #                                              livetime='20h')
-            #     sensit[site][zen].run()
-            #     for i in range(len(ModelsTab)):
-            #         sensit[site][zen].plot(ax=ax[ModelsTab[i]])  # WARNING: this is the diff sensit in erg cm-2 s-1 !!!
-
-
-# output = dict()
-# output = {'Source_Name' : [],
-#           'Redshift': [],
-#           'Irf_Site' : [],
-#           'Irf_Zen' : [],
-#           'Irf_Time' : [],
-#           'Livetime' : [],
-#           'Emin' : [],
-#           'Emin_Real' : [],
-#           'AboveEthFlag' : [],
-#           'Model_Name' : [],
-#           'Bkg' : [],
-#           'Excess' : [],
-#           'Sigma' : []
-# }
 
 
 for idx, isrc in enumerate(tqdm(catalog)):
     if isrc['Source_Name'] != 'J2158.8-3013':
-         continue
+        continue
     # if idx == 3:
     #     break
     if verbose:
@@ -186,21 +169,6 @@ for idx, isrc in enumerate(tqdm(catalog)):
 
     redshift = isrc['Redshift'] * u.Unit('')
 
-    # Absorbed spectral model
-    """
-    abs_pwlmodel = AbsorbedSpectralModel(spectral_model=pwlmodel,
-                                         absorption=absorption,
-                                         parameter=redshift)
-
-    abs_pwlmodel_cutoff = AbsorbedSpectralModelExpoCutOff(abs_pwlmodel,
-                                                          cut_off_energy / (1 + redshift))
-
-    abs_lpmodel = AbsorbedSpectralModel(spectral_model=lpmodel,
-                                      absorption=absorption,
-                                      parameter=redshift)
-    """
-
-    
     models['pwl_ebl'] = AbsorbedSpectralModel(spectral_model=pwlmodel,
                                               absorption=absorption,
                                               parameter=redshift)
@@ -276,21 +244,7 @@ for idx, isrc in enumerate(tqdm(catalog)):
                 idx_min = np.abs(reco_energy.lo - emin).argmin()
                 emin_real = reco_energy.lo[idx_min]
 
-
                 for mymodel in ModelsTab:
-                    sigmadictkey = 'Sigma_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
-                    excessdictkey = 'Excess_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
-                    bkgdictkey = 'Bkg_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
-                    detectdictkey = 'Detected_{}_{:d}h_Eth{:.3f}TeV_{}'.format(mysite, int(mylivetime.value), emin_real.value, mymodel)
-                    if sigmadictkey not in catalog.keys():
-                         catalog[sigmadictkey] = np.full(len(catalog), np.nan)
-                    if excessdictkey not in catalog.keys():
-                         catalog[excessdictkey] = np.full(len(catalog), np.nan)
-                    if bkgdictkey not in catalog.keys():
-                         catalog[bkgdictkey] = np.full(len(catalog), np.nan)
-                    if detectdictkey not in catalog.keys():
-                         catalog[detectdictkey] = np.full(len(catalog), np.nan)
-
                     target = Target(name=isrc['Source_Name'],model=models[mymodel])
 
                     simu = CTAObservationSimulation.simulate_obs(perf=ctaperf[mysite][irfzen][irftime],
@@ -303,13 +257,41 @@ for idx, isrc in enumerate(tqdm(catalog)):
                     bkg = simu.total_stats_safe_range.background
 
                     detected = sigmas>=5. and excess > 10 and excess > 0.05*bkg*alpha
-                    if detected and emin == EminTab[1] and mylivetime == 20.*u.h:
+                    if detected and emin == EminTab[1] and mylivetime == 20.*u.h and mysite=='South':
                         models[mymodel].plot(energy_range=[EminTab[0], emax],
                                              ax=ax[mymodel],
                                              linewidth=2.0,
                                              alpha=0.8)
+                        CTAObservationSimulation.plot_simu(simu, target)
 
-                    catalog[sigmadictkey][idx] = '{:.2f}'.format(sigmas)
-                    catalog[excessdictkey][idx] = '{:.2f}'.format(excess)
-                    catalog[bkgdictkey][idx] = '{:.2f}'.format(bkg)
-                    catalog[detectdictkey][idx] = detected
+                        obs_list = [simu]
+                        fit = SpectrumFit(obs_list=obs_list, model=models[mymodel])
+                        fit.fit()
+                        fit.est_errors()
+                        print(fit.result[0])
+
+                        # Flux points are computed on stacked observation
+                        ebounds = EnergyBounds.equal_log_spacing(0.01, 10, 15, unit=u.TeV)
+
+                        seg = SpectrumEnergyGroupMaker(obs=simu)
+                        seg.compute_range_safe()
+                        seg.compute_groups_fixed(ebounds=ebounds)
+
+                        fpe = FluxPointEstimator(
+                            obs=obs_list,
+                            groups=seg.groups,
+                            model=fit.result[0].model,
+                        )
+                        fpe.compute_points()
+                        fpe.flux_points.table
+
+                        total_result = SpectrumResult(
+                            model=fit.result[0].model,
+                            points=fpe.flux_points,
+                        )
+
+                        total_result.plot(
+                            energy_range=[EminTab[1], emax] * u.TeV,
+                            fig_kwargs=dict(figsize=(8, 8)),
+                            point_kwargs=dict(color='green'),
+                        )
