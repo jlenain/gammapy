@@ -166,8 +166,8 @@ for site in ['North','South']:
 
 
 for idx, isrc in enumerate(tqdm(catalog)):
-    # if isrc['Source_Name'] != 'J2158.8-3013':
-    #     continue
+    if isrc['Source_Name'] != 'J2158.8-3013':
+         continue
     # if idx == 3:
     #     break
     if verbose:
@@ -212,12 +212,6 @@ for idx, isrc in enumerate(tqdm(catalog)):
                                                absorption=absorption,
                                                parameter=redshift)
 
-    # # Hack to transform dN/dE in E^2 dN/dE, from cm^-2 s^-1 TeV^-1 in erg cm^-2 s^-1
-    # eaxis = np.logspace(np.log10(EminTab[0].value),np.log10(emax.value),100)*u.Unit('TeV')
-    # ax[ModelsTab[0]].plot(eaxis,
-    #                       [models['pwl_ebl'].energy_flux(eaxis[i], eaxis[i+1]) * 1.602 for i in range(len(eaxis)-1)],
-    #                       linestyle='--')
-
     models['pwl_ebl'].plot(energy_range=[EminTab[0], emax],
                            ax=ax[ModelsTab[0]],
                            linestyle='--',
@@ -235,13 +229,8 @@ for idx, isrc in enumerate(tqdm(catalog)):
                             alpha=0.4)
 
 
-    #pwlmodel.plot(energy_range=[0.01, 10] * u.TeV,label='pwl')
-    #abs_pwlmodel.plot(energy_range=[0.01, 10] * u.TeV,label='pwl+ebl')
-    #abs_pwlmodel_cutoff.plot(energy_range=[0.01, 10] * u.TeV,label='pwl+ebl+cutoff')
-    #abs_lpmodel.plot(energy_range=[0.01, 10] * u.TeV,label='lp+ebl')
 
     #Loops over time (5h, 20h), site (N,S), thresholds (var min, fixed max)
-
     dec = isrc['DEJ2000']*u.deg
 
     #Loop over both sites
@@ -319,67 +308,8 @@ for idx, isrc in enumerate(tqdm(catalog)):
                                              ax=ax[mymodel],
                                              linewidth=2.0,
                                              alpha=0.8)
-                    
-                    # output['Source_Name'].append(isrc['Source_Name'])
-                    # output['Redshift'].append(isrc['Redshift'])
-                    # output['Irf_Site'].append(mysite)
-                    # output['Irf_Zen'].append(float(irfzen))
-                    # output['Irf_Time'].append(float(irftime.split('h')[0]))
-                    # output['Livetime'].append(mylivetime.value) # pq je ne peux pas mettre une grandeur avec unite?
-                    # output['Emin'].append(emin.value)
-                    # output['Emin_Real'].append(emin_real.value)
-                    # output['Model_Name'].append(mymodel)
-                    # output['AboveEthFlag'].append(AboveEthFlag)
-                    # output['Bkg'].append(bkg)
-                    # output['Excess'].append(excess)
-                    # output['Sigma'].append(sigmas)
+
                     catalog[sigmadictkey][idx] = '{:.2f}'.format(sigmas)
                     catalog[excessdictkey][idx] = '{:.2f}'.format(excess)
                     catalog[bkgdictkey][idx] = '{:.2f}'.format(bkg)
                     catalog[detectdictkey][idx] = detected
-
-# results = Table()
-# results['Source_Name'] = Column(output['Source_Name'], description='Source name')
-# results['Redshift'] = Column(output['Redshift'], format='{:.3f}', unit='', description='Redshift')
-# results['Irf_Site'] = Column(output['Irf_Site'], description='Site of the considered CTA array')
-# results['Irf_Zen'] = Column(output['Irf_Zen'], format='{:.1f}', unit='degree', description='Zenith used for the IRF')
-# results['Irf_Time'] = Column(output['Irf_Time'], format='{:.1f}', unit='hour', description='Livetime used for the IRF')
-# results['Livetime'] = Column(output['Livetime'], format='{:.1f}', unit='hour', description='Observation time')
-# results['Eth'] = Column(output['Emin_Real'], format='{:.3f}', unit='TeV', description='Energy threshold')
-# results['Model_Name'] = Column(output['Model_Name'], unit='', description='Name of the spectral model')
-# results['Sigma'] = Column(output['Sigma'], format='{:.2f}', unit='', description='Significance')
-
-# results['Emin'] = Column(output['Emin'], unit='', description='')
-# results['Emin_Real'] = Column(output['Emin_Real'], unit='', description='')
-# results['AboveEthFlag'] = Column(output['AboveEthFlag'], unit='', description='')
-## results['SigmaErr'] = Column(src_sigma_err, unit='', description='')
-# results['Excess'] = Column(output['Excess'], unit='', description='')
-## results['ExcessErr'] = Column(src_excess_err, unit='', description='')
-# results['Bkg'] = Column(output['Bkg'], unit='', description='')
-## results['BkgErr'] = Column(src_bkg_err, unit='', description='')
-
-# Save results
-outdir = './'                  
-if not os.path.exists(outdir):
-    os.makedirs(outdir)
-
-if outputtype == 'ascii':
-    filename = 'results.txt'
-    catalog.write(outdir + filename, format='ascii', overwrite=True)
-elif outputtype == 'fits':
-    filename = 'results.fits'
-    catalog.write(outdir + filename, format='fits', overwrite=True)
-elif outputtype == 'both':
-    filename = 'results.txt'
-    catalog.write(outdir + filename, format='ascii', overwrite=True)
-    filename = 'results.fits'
-    catalog.write(outdir + filename, format='fits', overwrite=True)
-else:
-    print('Error: output format \'{}\' not defined, no output written'.format(outputtype))
-    sys.exit(1)
-    
-print('output file: {}'.format(outdir + filename))
-
-# pwlmodel.plot(energy_range=[0.1, 100] * u.TeV)
-# plt.legend()
-# plt.show()
