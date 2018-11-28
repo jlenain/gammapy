@@ -17,7 +17,7 @@ from ..wcsnd import WcsNDMap
 pytest.importorskip('scipy')
 pytest.importorskip('reproject')
 
-axes1 = [MapAxis(np.logspace(0., 3., 3), interp='log')]
+axes1 = [MapAxis(np.logspace(0., 3., 3), interp='log', name='spam')]
 axes2 = [MapAxis(np.logspace(0., 3., 3), interp='log'),
          MapAxis(np.logspace(1., 3., 4), interp='lin')]
 skydir = SkyCoord(110., 75.0, unit='deg', frame='icrs')
@@ -394,3 +394,14 @@ def test_make_region_mask():
     assert np.sum(maskmap.data) == 8
 
 
+@requires_dependency('scipy')
+@pytest.mark.parametrize('kernel', ['gauss', 'box', 'disk'])
+def test_smooth(kernel):
+    geom = WcsGeom.create(npix=(10, 10), binsz=1,
+                          proj='CAR', coordsys='GAL')
+    m = WcsNDMap(geom, data=np.ones((10, 10)), unit='m2')
+
+    desired = m.data.sum()
+    smoothed = m.smooth(0.2 * u.deg, kernel)
+    actual = smoothed.data.sum()
+    assert_allclose(actual, desired)

@@ -7,6 +7,8 @@ from astropy.wcs import WCS
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.coordinates.angle_utilities import angular_separation
+from astropy.coordinates import Angle
+import astropy.wcs.utils
 import astropy.units as u
 from regions import SkyRegion
 from ..image.utils import make_header
@@ -61,10 +63,10 @@ class WcsGeom(MapGeom):
     cdelt : tuple
         Pixel size in each image plane.  If none then a constant pixel size will be used.
     crpix : tuple
-        Reference pixel coordinate in each image plane.  
+        Reference pixel coordinate in each image plane.
     axes : list
         Axes for non-spatial dimensions
-    conv : {'gadf', 'fgst-ccube', 'fgst-template'}    
+    conv : {'gadf', 'fgst-ccube', 'fgst-template'}
         Serialization format convention.  This sets the default format
         that will be used when writing this geometry to a file.
     """
@@ -204,6 +206,20 @@ class WcsGeom(MapGeom):
         pix : `~astropy.coordinates.SkyCoord`
         """
         return self._center_skydir
+
+    @property
+    def pixel_scales(self):
+        """
+        Pixel scale.
+
+        Returns angles along each axis of the image at the CRPIX location once
+        it is projected onto the plane of intermediate world coordinates.
+
+        Returns
+        ------
+        angle: `~astropy.coordinates.Angle`
+        """
+        return Angle(astropy.wcs.utils.proj_plane_pixel_scales(self.wcs), 'deg')
 
     @classmethod
     def create(cls, npix=None, binsz=0.5, proj='CAR', coordsys='CEL', refpix=None,
@@ -545,7 +561,7 @@ class WcsGeom(MapGeom):
                     np.putmask(idxs[i], (idx < 0) | (idx >= npix[i]), -1)
                 else:
                     np.putmask(idxs[i], (idx < 0) | (
-                            idx >= self.axes[i - 2].nbin), -1)
+                               idx >= self.axes[i - 2].nbin), -1)
 
         return idxs
 
@@ -659,8 +675,23 @@ class WcsGeom(MapGeom):
         if not self.is_regular:
             raise NotImplementedError("Region mask is not working yet with multiresolution maps")
         idx = self.get_idx()
-        pixcoord = PixCoord(idx[0],idx[1])
+        pixcoord = PixCoord(idx[0], idx[1])
         return region.contains(pixcoord)
+
+    def __repr__(self):
+        str_ = self.__class__.__name__
+        str_ += "\n\n"
+        str_ += "\tnpix      : {npix[0][0]} x {npix[1][0]} pix\n".format(npix=self.npix)
+        str_ += "\tcoordsys  : {}\n".format(self.coordsys)
+        str_ += "\tprojection: {}\n".format(self.projection)
+        lon, lat = self.center_skydir.data.lon.deg, self.center_skydir.data.lat.deg
+        str_ += "\tcenter    : {lon:.1f} deg, {lat:.1f} deg\n".format(lon=lon, lat=lat)
+        str_ += ("\twidth     : {width[0][0]:.1f} x {width[1][0]:.1f} "
+                 "deg\n".format(width=self.width))
+        str_ += "\tndim      : {}\n".format(self.ndim)
+        axes = [_.name for _ in self.axes]
+        str_ += "\taxes      : {}\n".format(", ".join(axes))
+        return str_
 
 
 def create_wcs(skydir, coordsys='CEL', projection='AIT',

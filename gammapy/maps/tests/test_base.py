@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import pytest
 from collections import OrderedDict
 import numpy as np
+from numpy.testing import assert_equal
 from astropy.coordinates import SkyCoord
 from astropy.units import Unit, Quantity
 from ..base import Map
@@ -31,22 +32,57 @@ mapbase_args = [
     (0.1, 10.0, 'hpx-sparse', SkyCoord(0.0, 30.0, unit='deg'), None, ''),
 ]
 
+mapbase_args_with_axes = [_ for _ in mapbase_args if _[4] is not None]
+
 
 @pytest.mark.parametrize(('binsz', 'width', 'map_type', 'skydir', 'axes', 'unit'),
                          mapbase_args)
 def test_map_create(binsz, width, map_type, skydir, axes, unit):
     m = Map.create(binsz=binsz, width=width, map_type=map_type,
                    skydir=skydir, axes=axes, unit=unit)
+    assert m.unit == unit
 
 
 def test_map_from_geom():
     geom = WcsGeom.create(binsz=1.0, width=10.0)
     m = Map.from_geom(geom)
     assert isinstance(m, WcsNDMap)
+    assert m.geom.is_image
 
     geom = HpxGeom.create(binsz=1.0, width=10.0)
     m = Map.from_geom(geom)
     assert isinstance(m, HpxNDMap)
+    assert m.geom.is_image
+
+
+@pytest.mark.parametrize(('binsz', 'width', 'map_type', 'skydir', 'axes', 'unit'),
+                         mapbase_args_with_axes)
+def test_map_get_image_by_coord(binsz, width, map_type, skydir, axes, unit):
+    m = Map.create(binsz=binsz, width=width, map_type=map_type,
+                   skydir=skydir, axes=axes, unit=unit)
+    m.data = np.arange(m.data.size, dtype=float).reshape(m.data.shape)
+
+    coords = (3.456, 0.1234)[:len(m.geom.axes)]
+    m_image = m.get_image_by_coord(coords)
+
+    im_geom = m.geom.to_image()
+    skycoord = im_geom.get_coord().skycoord
+    m_vals = m.get_by_coord((skycoord,) + coords)
+    assert_equal(m_image.data, m_vals)
+
+
+@pytest.mark.parametrize(('binsz', 'width', 'map_type', 'skydir', 'axes', 'unit'),
+                         mapbase_args_with_axes)
+def test_map_get_image_by_pix(binsz, width, map_type, skydir, axes, unit):
+    m = Map.create(binsz=binsz, width=width, map_type=map_type,
+                   skydir=skydir, axes=axes, unit=unit)
+    pix = (1.2345, 0.1234)[:len(m.geom.axes)]
+    m_image = m.get_image_by_pix(pix)
+
+    im_geom = m.geom.to_image()
+    idx = im_geom.get_idx()
+    m_vals = m.get_by_pix(idx + pix)
+    assert_equal(m_image.data, m_vals)
 
 
 @pytest.mark.parametrize('map_type', ['wcs', 'hpx', 'hpx-sparse'])
@@ -99,3 +135,9 @@ def test_map_unit_read_write(map_type, unit):
 
     m2 = Map.from_hdu_list(hdu_list)
     assert m2.unit == unit
+
+
+@pytest.mark.parametrize(('map_type', 'unit'), unit_args)
+def test_map_repr(map_type, unit):
+    m = Map.create(binsz=0.1, width=10.0, map_type=map_type, unit=unit)
+    assert m.__class__.__name__ in repr(m)

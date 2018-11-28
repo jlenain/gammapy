@@ -45,34 +45,40 @@ def make_axes_cols(axes, axis_names=None):
 
     Parameters
     ----------
-    axes : list of `~MapAxis`
+    axes : list
+        Python list of `MapAxis` objects
 
-    axis_names : list of str
-
+    Returns
+    -------
+    cols : list
+        Python list of `~astropy.io.fits.Column`
     """
-    colname = {
-        'energy': ['ENERGY', 'E_MIN', 'E_MAX'],
-        'time': ['TIME', 'T_MIN', 'T_MAX'],
-    }
-
-    if axis_names is None:
-        axis_names = [ax.name for ax in axes]
-
     size = np.prod([ax.nbin for ax in axes])
     chan = np.arange(0, size)
     cols = [fits.Column('CHANNEL', 'I', array=chan), ]
+
+    if axis_names is None:
+        axis_names = [ax.name for ax in axes]
+    axis_names = [_.upper() for _ in axis_names]
+
     axes_ctr = np.meshgrid(*[ax.center for ax in axes])
     axes_min = np.meshgrid(*[ax.edges[:-1] for ax in axes])
     axes_max = np.meshgrid(*[ax.edges[1:] for ax in axes])
+
     for i, (ax, name) in enumerate(zip(axes, axis_names)):
 
-        names = colname.get(name.lower(),
-                            ['AXIS%i' % i,
-                             'AXIS%i_MIN' % i, 'AXIS%i_MAX' % i])
-        for t, v in zip(names, [axes_ctr, axes_min, axes_max]):
+        if name == 'ENERGY':
+            colnames = ['ENERGY', 'E_MIN', 'E_MAX']
+        elif name == 'TIME':
+            colnames = ['TIME', 'T_MIN', 'T_MAX']
+        else:
+            s = 'AXIS%i' % i if name == '' else name
+            colnames = [s, s + '_MIN', s + '_MAX']
+
+        for colname, v in zip(colnames, [axes_ctr, axes_min, axes_max]):
             array = np.ravel(v[i])
             unit = ax.unit.to_string()
-            cols.append(fits.Column(t, 'E', array=array, unit=unit))
+            cols.append(fits.Column(colname, 'E', array=array, unit=unit))
 
     return cols
 
@@ -603,6 +609,19 @@ class MapAxis(object):
         return MapAxis(nodes, interp=self._interp, name=self._name,
                        node_type=self._node_type, unit=self._unit)
 
+    def __repr__(self):
+        str_ = self.__class__.__name__
+        str_ += "\n\n"
+        str_ += "\tname     : {}\n".format(self.name)
+        str_ += "\ttype     : {}\n".format(self.type)
+        str_ += "\tunit     : {}\n".format(self.unit)
+        str_ += "\tnbins    : {}\n".format(self.nbin)
+        str_ += "\tnode type: {}\n".format(self.node_type)
+        str_ += "\tedge min : {:.1e} {}\n".format(self.edges.min(), self.unit)
+        str_ += "\tedge max : {:.1e} {}\n".format(self.edges.max(), self.unit)
+        str_ += "\tinterp   : {}\n".format(self._interp)
+        return str_
+
 
 class MapCoord(object):
     """Represents a sequence of n-dimensional map coordinates.
@@ -616,7 +635,7 @@ class MapCoord(object):
     ----------
     data : `~collections.OrderedDict` of `~numpy.ndarray`
         Dictionary of coordinate arrays.
-    coordsys : {'CEL', 'GAL', None}    
+    coordsys : {'CEL', 'GAL', None}
         Spatial coordinate system.  If None then the coordinate system
         will be set to the native coordinate system of the geometry.
     copy : bool
@@ -726,11 +745,11 @@ class MapCoord(object):
         ----------
         coords : tuple
             Coordinate tuple with first element of type
-            `~astropy.coordinates.SkyCoord`.        
+            `~astropy.coordinates.SkyCoord`.
         coordsys : {'CEL', 'GAL', None}
             Spatial coordinate system of output `~MapCoord` object.
             If None the coordinate system will be set to the frame of
-            the `~astropy.coordinates.SkyCoord` object.        
+            the `~astropy.coordinates.SkyCoord` object.
         """
         skycoord = coords[0]
         if skycoord.frame.name in ['icrs', 'fk5']:
@@ -1287,7 +1306,7 @@ class MapGeom(object):
 
     @abc.abstractmethod
     def upsample(self, factor):
-        """Upsample the spatial dimension of the geometry by a given factor. 
+        """Upsample the spatial dimension of the geometry by a given factor.
 
         Parameters
         ----------
@@ -1323,3 +1342,11 @@ class MapGeom(object):
             else:
                 raise ValueError('Invalid node type '
                                  '{}'.format(ax.node_type))
+
+    @property
+    def is_image(self):
+        """Whether the geom is equivalent to an image without extra dimensions."""
+        if self.axes is None:
+            return True
+        is_image = len(self.axes) == 0
+        return is_image
